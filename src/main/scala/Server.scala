@@ -1,8 +1,10 @@
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.ws.{Message, TextMessage}
 import akka.http.scaladsl.model.{ContentTypes, HttpEntity}
 import akka.http.scaladsl.server.Directives._
 import akka.stream.ActorMaterializer
+import akka.stream.scaladsl.Flow
 
 import scala.io.StdIn
 
@@ -15,13 +17,20 @@ object Server extends App {
   // needed for the future flatMap/onComplete in the end
   implicit val executionContext = system.dispatcher
 
+  val echoService: Flow[Message, Message, _] = Flow[Message].map {
+    case TextMessage.Strict(txt) => TextMessage("ECHO: " + txt)
+    case _ => TextMessage("Message type unsupported")
+  }
+
   val route = get {
     pathEndOrSingleSlash {
       complete("Welcome to akka sample")
-    } ~ path("hello") {
-      get {
-        complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Say hello to akka-http</h1>"))
-      }
+    }
+  } ~ path("hello") {
+    complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, "<h1>Say hello to akka-http</h1>"))
+  } ~ path("ws-echo") {
+    get {
+      handleWebSocketMessages(echoService)
     }
   }
 
